@@ -1,0 +1,21 @@
+{
+  "name": "pokemon-go",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "dynamodb-data-types": "^3.0.0",
+    "pokemon-go-node-api": "^1.2.6"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.11.4"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "babel ",
+    "zip": "zip PokeTrackr.zip node_modules constants.js new-request.js poke-trackr.js scanner.js",
+    "deploy": "aws lambda update-function-code --function-name PokeGoSentry1 --zip-file fileb://PokeTrackr.zip"
+  },
+  "author": "",
+  "license": "ISC"
+}
