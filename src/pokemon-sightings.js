@@ -1,11 +1,12 @@
+import dynamoDataMapper from 'dynamodb-data-types'
+console.log(dynamoDataMapper)
 const AWS = require('aws-sdk');
 const SIGHTINGS_TABLE = require('constants')
-module.exports = function({
+export default function({
     event,
     pokemonSightings
 }) {
     const dynamodb = new AWS.DynamoDB();
-    const Item = dynamoDataMapper.wrap(pokemonSighting)
     const sightingPutRequests = pokemonSightings.map(pokemonSighting => {
         return {
             PutRequest: {

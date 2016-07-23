@@ -1,4 +1,5 @@
-
+import dynamoDataMapper from 'dynamodb-data-types'
+console.log(dynamoDataMapper)
 const REQUESTS_TABLE = require('constants')
 module.exports = function({event, request}) {
     const dynamodb = new AWS.DynamoDB();

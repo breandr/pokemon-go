@@ -1,7 +1,8 @@
 'use strict';
 console.log('Loading function');
-const pokeTrackr = require('./poke-trackr')
-const logPokemonSighting = require('./pokemon-sightings')
+import pokeTrackr from './poke-trackr'
+import logPokemonSightings from './pokemon-sightings'
+console.log(logPokemonSightings)
 
 /**
  * Provide an event that contains the following keys:
@@ -10,7 +11,7 @@ const logPokemonSighting = require('./pokemon-sightings')
  *   - tableName: required for operations that interact with DynamoDB
  *   - payload: a parameter to pass to the operation being performed
  */
-exports.handler = (event, context, callback) => {
+export default function (event, context, callback) {
     console.log('Received event:', JSON.stringify(event, null, 2));
 
     const POKEMON_IGNORE_LIST = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 27, 41, 42, 42, 44, 46, 48, 50, 52, 56, 58, 63, 69, 74, 84, 104, 127]
@@ -29,10 +30,12 @@ exports.handler = (event, context, callback) => {
     const initCallback = function(error, response) {
       if(error) throw error
     }
-    const heartbeatCallback = function(error, response) {
+    const heartbeatCallback = function(error, {pokemonSightings, pointsOfInterestMapUrl}) {
       if(error) throw error
-
-      logPokemonSightings(response.pokemonSightings)
+      console.log('=========')
+      console.log(pointsOfInterestMapUrl)
+      console.log('=========')
+      // logPokemonSightings({pokemonSightings})
     }
 
     pokeTrackr.init({username, password, centerLocation, provider, initCallback, heartbeatCallback})
