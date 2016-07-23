@@ -29,7 +29,7 @@ const heartbeatCallback = function({pokemonSightings, pointsOfInterestMapUrl, ce
 pokeTrackr.init({username, password, centerLocation, provider})
 .then(() => {
   function scanForPokemon() {
-    console.log(pokeTrackr.scanForPokemon)
+    console.log(pokeTrackr)
       return pokeTrackr.scanForPokemon({centerLocation})
       .then(({pokemonLocations}) => {
         console.log(pokemonLocations)
