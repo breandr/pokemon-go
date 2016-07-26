@@ -8,7 +8,72 @@ winston.level = 'info'
 const DEFAULT_MAP_ZOOM_LEVEL = 15
 const DEFAULT_WALK_DISTANCE = 0.0009
 const TEAMS = ['Neutral', 'Blue', 'Red', 'Yellow']
-
+const ITEM_NAME_TO_ID_MAP = {
+      ITEM_UNKNOWN: 0,
+      ITEM_POKE_BALL: 1,
+      ITEM_GREAT_BALL: 2,
+      ITEM_ULTRA_BALL: 3,
+      ITEM_MASTER_BALL: 4,
+      ITEM_POTION: 101,
+      ITEM_SUPER_POTION: 102,
+      ITEM_HYPER_POTION: 103,
+      ITEM_MAX_POTION: 104,
+      ITEM_REVIVE: 201,
+      ITEM_MAX_REVIVE: 202,
+      ITEM_LUCKY_EGG: 301,
+      ITEM_INCENSE_ORDINARY: 401,
+      ITEM_INCENSE_SPICY: 402,
+      ITEM_INCENSE_COOL: 403,
+      ITEM_INCENSE_FLORAL: 404,
+      ITEM_TROY_DISK: 501,
+      ITEM_X_ATTACK: 602,
+      ITEM_X_DEFENSE: 603,
+      ITEM_X_MIRACLE: 604,
+      ITEM_RAZZ_BERRY: 701,
+      ITEM_BLUK_BERRY: 702,
+      ITEM_NANAB_BERRY: 703,
+      ITEM_WEPAR_BERRY: 704,
+      ITEM_PINAP_BERRY: 705,
+      ITEM_SPECIAL_CAMERA: 801,
+      ITEM_INCUBATOR_BASIC_UNLIMITED: 901,
+      ITEM_INCUBATOR_BASIC: 902,
+      ITEM_POKEMON_STORAGE_UPGRADE: 1001,
+      ITEM_ITEM_STORAGE_UPGRADE: 1002,
+}
+const ITEM_ID_TO_NAME_MAP = {
+      0: 'ITEM_UNKNOWN',
+      1: 'ITEM_POKE_BALL',
+      2: 'ITEM_GREAT_BALL',
+      3: 'ITEM_ULTRA_BALL',
+      4: 'ITEM_MASTER_BALL',
+      101: 'ITEM_POTION',
+      102: 'ITEM_SUPER_POTION',
+      103: 'ITEM_HYPER_POTION',
+      104: 'ITEM_MAX_POTION',
+      201: 'ITEM_REVIVE',
+      202: 'ITEM_MAX_REVIVE',
+      301: 'ITEM_LUCKY_EGG',
+      401: 'ITEM_INCENSE_ORDINARY',
+      402: 'ITEM_INCENSE_SPICY',
+      403: 'ITEM_INCENSE_COOL',
+      404: 'ITEM_INCENSE_FLORAL',
+      501: 'ITEM_TROY_DISK',
+      602: 'ITEM_X_ATTACK',
+      603: 'ITEM_X_DEFENSE',
+      604: 'ITEM_X_MIRACLE',
+      701: 'ITEM_RAZZ_BERRY',
+      702: 'ITEM_BLUK_BERRY',
+      703: 'ITEM_NANAB_BERRY',
+      704: 'ITEM_WEPAR_BERRY',
+      705: 'ITEM_PINAP_BERRY',
+      801: 'ITEM_SPECIAL_CAMERA',
+      901: 'ITEM_INCUBATOR_BASIC_UNLIMITED',
+      902: 'ITEM_INCUBATOR_BASIC',
+      1001: 'ITEM_POKEMON_STORAGE_UPGRADE',
+      1002: 'ITEM_ITEM_STORAGE_UPGRADE'
+}
+const CATCH_POKEMON_STATUS = ['Unexpected error', 'Successful catch', 'Catch Escape', 'Catch Flee', 'Missed Catch']
+const SEARCH_POKE_STOPS_STATUS = ['No result set', 'Success', 'Out of range', 'In cooldown period', 'Inventory full']
 function getUser({username, password, provider}){
   const pokeIo = new PokemonGo.Pokeio()
   const user = promisify(pokeIo, undefined, true)
@@ -198,52 +263,56 @@ function getUser({username, password, provider}){
         })
   }
 
-  // NOTE: not working - getting unexpected cells
-  function walkNeighboringCells({centerLocation, neighboringCells, attemptToCatch = false}) {
+  // NOTE: not working - getting unexpected cells, propbably bug in s2 lib
+  // function walkNeighboringCells({centerLocation, neighboringCells, attemptToCatch = false}) {
+  //   const pokemonLocations = []
+  //   const cellsScanned = []
+  //
+  //   const steps = neighboringCells.map(cell => {
+  //     return function () {
+  //             const {latitude, longitude} = getCellCenterLatLng({cell})
+  //             const nextLocation = {
+  //               type: 'coords',
+  //               coords: {
+  //                 latitude,
+  //                 longitude
+  //               }
+  //             }
+  //
+  //           return setLocationAndSearch({centerLocation: nextLocation, numNeighborCells: 0})
+  //           .then(heartbeat => {
+  //                 const cell = heartbeat.cells[0]
+  //                 cellsScanned.push(getCellFromId(cell.S2CellId))
+  //                 printCellData({cell})
+  //                 const mapPokemonFound = getMapPokemon({mapPokemons: cell.MapPokemon})
+  //                 if(mapPokemonFound.length) {
+  //                   winston.debug(mapPokemonFound)
+  //                   pokemonLocations.push(...mapPokemonFound)
+  //                 }
+  //
+  //                 if(attemptToCatch) {
+  //                   mapPokemonFound.forEach(pokemon => {
+  //                     const pokedexInfo = getPokedexInfo({pokemonId: pokemon.PokedexTypeId})
+  //                     winston.debug(`Found a ${pokedexInfo.name}! Attempting to catch...`)
+  //                     catchPokemon({pokemon})
+  //                   })
+  //                 }
+  //             })
+  //         }
+  //   })
+  //
+  //   return steps.reduce((promise, step) => promise.then(step), Promise.resolve())
+  //   .then(() => {
+  //     return {pokemonLocations, cellsScanned}
+  //   })
+  // }
+
+  function walkArea({centerLocation, radius, attemptToCatch = false, searchPokeStops = false, delta = DEFAULT_WALK_DISTANCE}) {
     const pokemonLocations = []
-    const cellsScanned = []
-
-    const steps = neighboringCells.map(cell => {
-      return function () {
-              const {latitude, longitude} = getCellCenterLatLng({cell})
-              const nextLocation = {
-                type: 'coords',
-                coords: {
-                  latitude,
-                  longitude
-                }
-              }
-
-            return setLocationAndSearch({centerLocation: nextLocation, numNeighborCells: 0})
-            .then(heartbeat => {
-                  const cell = heartbeat.cells[0]
-                  cellsScanned.push(getCellFromId(cell.S2CellId))
-                  printCellData({cell})
-                  const wildPokemonFound = getWildPokemon({wildPokemons: cell.WildPokemon})
-                  if(wildPokemonFound.length) {
-                    winston.debug(wildPokemonFound)
-                    pokemonLocations.push(...wildPokemonFound)
-                  }
-
-                  if(attemptToCatch) {
-                    wildPokemonFound.forEach(pokemon => {
-                      const pokedexInfo = getPokedexInfo({pokemonId: pokemon.pokemon.PokemonId})
-                      winston.debug(`Found a ${pokedexInfo.name}! Attempting to catch...`)
-                      catchPokemon({pokemon})
-                    })
-                  }
-              })
-          }
-    })
-
-    return steps.reduce((promise, step) => promise.then(step), Promise.resolve())
-    .then(() => {
-      return {pokemonLocations, cellsScanned}
-    })
-  }
-
-  function walkArea({centerLocation, radius, attemptToCatch = false, delta = DEFAULT_WALK_DISTANCE}) {
-    const pokemonLocations = []
+    const pokemonCaught = []
+    const pokeStopLocations = []
+    const pokeStopsSearched = []
+    const itemsAwarded = {}
     const cellsScanned = []
     const latitude = centerLocation.coords.latitude-(radius/2)*delta;
     const longitude = centerLocation.coords.longitude-(radius/2)*delta;
@@ -274,52 +343,80 @@ function getUser({username, password, provider}){
 
             cellsScanned.push(getCellFromId(cell.S2CellId))
             printCellData({cell})
-            const wildPokemonFound = getWildPokemon({wildPokemons: cell.WildPokemon})
-            if(wildPokemonFound.length) {
-              pokemonLocations.push(...wildPokemonFound)
+            const mapPokemonFound = getMapPokemon({mapPokemons: cell.MapPokemon})
+            const pokeStopForts = cell.Fort.filter(fort => fort.FortType === 1)
+            const pokeStopsFound = getPokeStops({pokeStops: pokeStopForts})
+
+            let catchPokemonPromise = Promise.resolve()
+            let searchPokeStopsPromise = Promise.resolve()
+            if(mapPokemonFound.length) {
+              pokemonLocations.push(...mapPokemonFound)
 
               if(attemptToCatch) {
-                wildPokemonFound.forEach(wildPokemon => {
-                  const pokemon = wildPokemon.data
-                  const pokedexInfo = getPokedexInfo({pokemonId: pokemon.pokemon.PokemonId})
-                  winston.info(`Found a ${pokedexInfo.name}! Attempting to catch...`)
-                  //////////////////////////
-                          // console.log('[+] There is a ' + pokedexInfo.name + ' near!! I can try to catch it!');
-                          //
-                          // user.EncounterPokemon(pokemon)
-                          // .then(dat => {
-                          //     console.log('Encountering pokemon ' + pokedexInfo.name + '...');
-                          //     return user.CatchPokemon(pokemon, 1, 1.950, 1, 1)
-                          //     .then(xdat =>  {
-                          //         var status = ['Unexpected error', 'Successful catch', 'Catch Escape', 'Catch Flee', 'Missed Catch'];
-                          //         console.log(status[xdat.Status]);
-                          //     })
-                          // })
-                          // .catch(e => {
-                          //   console.error(e)
-                          // });
-                  ////////////////////////
-                  catchPokemon({pokemon}).then(response => {
-                    console.log(response)
-                    winston.info(response)
-                  }).catch(e => {
-                    console.error(e)
+                const catchPokemonActions = mapPokemonFound.map(mapPoke => {
+                  return function() {
+                      const pokemon = mapPoke.data
+                      const pokedexInfo = getPokedexInfo({pokemonId: pokemon.PokedexTypeId})
+                      winston.info(`Found a ${pokedexInfo.name}! Attempting to catch...`)
+                      return catchPokemon({pokemon})
+                        .then(catchPokemonResponse => {
+                          if(catchPokemonResponse.Status === 1) {
+                            pokemonCaught.push(pokedexInfo.name)
+                          }
+
+                          return catchPokemonResponse
+                        })
+                        .catch(e => {
+                          console.error(e)
+                        })
+                    }
                   })
-                })
+                catchPokemonPromise = catchPokemonActions.reduce((promise, catchPokemonAction) => promise.then(catchPokemonAction), Promise.resolve())
               }
             }
+
+            if(pokeStopsFound.length) {
+              pokeStopLocations.push(...pokeStopsFound)
+
+              if(searchPokeStops) {
+                const searchPokeStopActions = pokeStopsFound.map(pokeStopFound => {
+                  return function() {
+                      const pokeStop = pokeStopFound.data
+                      if(pokeStop.CooldownCompleteMs !== null) return Promise.resolve()
+                      winston.debug(`Found a PokeStop! Attempting to search...`)
+                      console.log('searching')
+                      return searchFort({fortId: pokeStop.FortId, latitude: pokeStop.Latitude, longitude: pokeStop.Longitude})
+                      .then(searchPokeStopResponse => {
+                        if(searchPokeStopResponse.result === 1 && searchPokeStopResponse.items_awarded.length) {
+                          pokeStopsSearched.push(searchPokeStopResponse)
+                          searchPokeStopResponse.items_awarded.forEach(item => {
+                            const itemName = ITEM_ID_TO_NAME_MAP[item.item_id]
+                            itemsAwarded[itemName] = itemsAwarded[itemName] ? itemsAwarded[itemName] + item.item_count : item.item_count
+                          })
+                        }
+
+                        return searchPokeStopResponse
+                      })
+                    }
+                  })
+                  searchPokeStopsPromise = searchPokeStopActions.reduce((promise, searchPokeStopAction) => promise.then(searchPokeStopAction), Promise.resolve())
+              }
+            }
+
+            return Promise.all([catchPokemonPromise, searchPokeStopsPromise])
         })
       }
     })
 
     return steps.reduce((promise, step) => promise.then(step), Promise.resolve())
     .then(() => {
-      return {pokemonLocations, coords, cellsScanned}
+      return {pokemonLocations, pokemonCaught, pokeStopsSearched, itemsAwarded, coords, cellsScanned}
     })
   }
 
   function catchPokemon({pokemon}) {
-    const pokedexInfo = getPokedexInfo({pokemonId: pokemon.pokemon.PokemonId})
+    const pokedexInfo = getPokedexInfo({pokemonId: pokemon.PokedexTypeId})
+
     return user.EncounterPokemon(pokemon)
     .then(encounterPokemonResponse => {
         winston.info(`Encountering pokemon ${pokedexInfo.name}...`)
@@ -330,10 +427,34 @@ function getUser({username, password, provider}){
 
         return user.CatchPokemon(pokemon, normalizedHitPosition, normalizedReticleSize, spinModifier, pokeball)
         .then(catchPokemonResponse => {
-            const status = ['Unexpected error', 'Successful catch', 'Catch Escape', 'Catch Flee', 'Missed Catch'];
-            winston.debug('catchPokemonResponseStatus', status[catchPokemonResponse.Status]);
-            winston.debug('catchPokemonResponse', catchPokemonResponse)
+          console.log(catchPokemonResponse)
+            if(catchPokemonResponse.Status === null) {
+              winston.info(`You either have no pokeballs or pokemon storage is full`)
+            } else if(catchPokemonResponse.Status === 1) {
+              winston.info(`Caught ${pokedexInfo.name}!`)
+            } else if(catchPokemonResponse.Status === 3) {
+              winston.info(`${pokedexInfo.name} ran away! If this keeps happening, you might have been soft-banned...`)
+            }
+
+            return catchPokemonResponse
         })
+    })
+  }
+
+  function searchFort({fortId, latitude, longitude}) {
+    winston.debug('searching fort', fortId)
+
+    const pokeStopLocation = {
+      type: 'coords',
+      coords: { latitude, longitude}
+    }
+    return user.SetLocation(pokeStopLocation)
+    .then(() => user.GetFort(fortId, latitude, longitude))
+    .then(searchFortResponse => {
+      if(searchFortResponse.result === 1 && !searchFortResponse.items_awarded.length) {
+        winston.info(`Item storage is full, or you've been soft-banned`)
+      }
+      return searchFortResponse
     })
   }
 
@@ -350,7 +471,7 @@ function getUser({username, password, provider}){
           const gyms = []
           const pokeStops = []
           const wildPokemon = []
-          // const mapPokemon = []
+          const mapPokemon = []
           const nearbyPokemon = []
           heartbeat.cells.forEach(cell => {
               printCellData({cell, ignore: ['S2CellId', 'AsOfTimeMs', 'IsTruncatedList', 'SpawnPoint', 'DecimatedSpawnPoint', 'Fort', 'WildPokemon', 'MapPokemon', 'NearbyPokemon']})
@@ -362,7 +483,7 @@ function getUser({username, password, provider}){
               const cellGyms = getGyms({gyms: gymForts})
               const cellPokeStops = getPokeStops({pokeStops: pokeStopForts})
               const cellWildPokemon = getWildPokemon({wildPokemons: cell.WildPokemon})
-              // const cellMapPokemon = getMapPokemon({mapPokemons: cell.MapPokemon})
+              const cellMapPokemon = getMapPokemon({mapPokemons: cell.MapPokemon})
               const cellNearbyPokemon = getNearbyPokemon({nearbyPokemons: cell.NearbyPokemon}) // can't usefully map these as they do not have latitude/longitude - best you can do is map based on cell location and show distance
 
               if(cellSpawnPoints.length) spawnPoints.push(cellSpawnPoints)
@@ -370,14 +491,14 @@ function getUser({username, password, provider}){
               if(cellGyms.length) spawnPoints.push(cellGyms)
               if(cellPokeStops.length) spawnPoints.push(cellPokeStops)
               if(cellWildPokemon.length) spawnPoints.push(cellWildPokemon)
-              // if(cellMapPokemon.length) spawnPoints.push(cellMapPokemon)
+              if(cellMapPokemon.length) spawnPoints.push(cellMapPokemon)
               if(cellNearbyPokemon.length) spawnPoints.push(cellNearbyPokemon)
 
               const s2Cell = getCellFromId(cell.S2CellId)
               neighboringCells.push(s2Cell)
           });
 
-          const pointsOfInterest = [centerLocation.coords, ...spawnPoints, ...decimatedSpawnPoints, ...gyms, ...pokeStops, ...wildPokemon]
+          const pointsOfInterest = [centerLocation.coords, ...spawnPoints, ...decimatedSpawnPoints, ...gyms, ...pokeStops, ...wildPokemon, ...mapPokemon]
 
           return {
             pokemonSightings: [],
@@ -388,7 +509,7 @@ function getUser({username, password, provider}){
             gyms,
             pokeStops,
             wildPokemon,
-            // mapPokemon,
+            mapPokemon,
             nearbyPokemon
           }
       })
@@ -446,15 +567,15 @@ function getUser({username, password, provider}){
     return {latitude: parseFloat(latitude), longitude: parseFloat(longitude)}
   }
 
-  function scanForPokemon({centerLocation, radius = 8, numNeighborCells = 20, mapZoomLevel = DEFAULT_MAP_ZOOM_LEVEL, attemptToCatch, method = 'WALK'}) {
+  function scanForPokemon({centerLocation, radius = 8, numNeighborCells = 20, mapZoomLevel = DEFAULT_MAP_ZOOM_LEVEL, attemptToCatch = false, searchPokeStops = false, method = 'WALK'}) {
     winston.info('Scanning for pokemon...')
     const scan = searchCurrentLocation({centerLocation, numNeighborCells, mapZoomLevel})
 
     switch(method) {
       case 'CELLS':
-        return scan.then(({neighboringCells}) => walkNeighboringCells({centerLocation, neighboringCells, mapZoomLevel, attemptToCatch}))
+        return scan.then(({neighboringCells}) => walkNeighboringCells({centerLocation, neighboringCells, mapZoomLevel, attemptToCatch, searchPokeStops}))
       default:
-        return scan.then(({neighboringCells}) => walkArea({centerLocation, radius, mapZoomLevel, attemptToCatch}))
+        return scan.then(({neighboringCells}) => walkArea({centerLocation, radius, mapZoomLevel, attemptToCatch, searchPokeStops}))
     }
   }
 
