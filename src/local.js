@@ -36,7 +36,7 @@ user.init({user, centerLocation})
       })
   }
 
-  return user.scanForPokemon({centerLocation, numNeighborCells: 21, radius: 5, mapZoomLevel: 13, attemptToCatch: true, searchPokeStops: false, method: 'WALK'})
+  return user.scanForPokemon({centerLocation, numNeighborCells: 21, radius: 10, mapZoomLevel: 13, attemptToCatch: false, searchPokeStops: true, method: 'WALK'})
   .then(({pokemonLocations, pokemonCaught, pokeStopsSearched, itemsAwarded, coords, cellsScanned}) => {
       const coordsMapUrl = user.getStaticMapUrl({centerLocation, markers: coords})
       const pokemonMapUrl = user.getStaticMapUrl({centerLocation, markers: pokemonLocations})

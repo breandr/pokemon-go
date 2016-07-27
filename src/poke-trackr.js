@@ -3,7 +3,7 @@ const PokemonGo = require('pokemon-go-node-api/poke.io')
 const s2Geo = require('s2geometry-node')
 const async = require('async')
 const winston = require('winston')
-winston.level = 'info'
+winston.level = 'debug'
 
 const DEFAULT_MAP_ZOOM_LEVEL = 15
 const DEFAULT_WALK_DISTANCE = 0.0009
@@ -98,6 +98,7 @@ function getUser({username, password, provider}){
   }
 
   function printCellData({cell, ignore = ['S2CellId', 'AsOfTimeMs', 'IsTruncatedList']}) {
+    return
       Object.keys(cell)
       .filter(key => ignore.indexOf(key) === -1)
       .forEach(key => {
@@ -190,7 +191,7 @@ function getUser({username, password, provider}){
 
   function getPokeStops({pokeStops}) {
     return pokeStops.map(pokeStop => {
-        winston.debug(pokeStop)
+        winston.debug(`pokeStop at <a href="http://maps.google.com/maps?&z=${DEFAULT_MAP_ZOOM_LEVEL}&q=${pokeStop.Latitude}+${pokeStop.Longitude}&ll=${pokeStop.Latitude}+${pokeStop.Longitude}">${pokeStop.Latitude},${pokeStop.Longitude}</a>`)
         return {
           type: 'pokeStop',
           latitude: pokeStop.Latitude,
@@ -381,22 +382,36 @@ function getUser({username, password, provider}){
               if(searchPokeStops) {
                 const searchPokeStopActions = pokeStopsFound.map(pokeStopFound => {
                   return function() {
-                      const pokeStop = pokeStopFound.data
-                      if(pokeStop.CooldownCompleteMs !== null) return Promise.resolve()
-                      winston.debug(`Found a PokeStop! Attempting to search...`)
-                      console.log('searching')
-                      return searchFort({fortId: pokeStop.FortId, latitude: pokeStop.Latitude, longitude: pokeStop.Longitude})
-                      .then(searchPokeStopResponse => {
-                        if(searchPokeStopResponse.result === 1 && searchPokeStopResponse.items_awarded.length) {
-                          pokeStopsSearched.push(searchPokeStopResponse)
-                          searchPokeStopResponse.items_awarded.forEach(item => {
-                            const itemName = ITEM_ID_TO_NAME_MAP[item.item_id]
-                            itemsAwarded[itemName] = itemsAwarded[itemName] ? itemsAwarded[itemName] + item.item_count : item.item_count
-                          })
+                      const waitPromise = new Promise(resolve => {
+                        const pokeStop = pokeStopFound.data
+
+                        winston.debug(`Found a PokeStop! Attempting to search...`)
+
+                        if(pokeStop.CooldownCompleteMs !== null) {
+                          winston.debug('pokeStop is on cooldown')
+                          return resolve()
                         }
 
-                        return searchPokeStopResponse
+                        return searchFort({fortId: pokeStop.FortId, latitude: pokeStop.Latitude, longitude: pokeStop.Longitude})
+                        .then(searchPokeStopResponse => {
+                          winston.debug('searchPokeStopResponse', searchPokeStopResponse)
+                          if(searchPokeStopResponse.result === 1 && searchPokeStopResponse.items_awarded.length) {
+                            pokeStopsSearched.push(searchPokeStopResponse)
+                            searchPokeStopResponse.items_awarded.forEach(item => {
+                              const itemName = ITEM_ID_TO_NAME_MAP[item.item_id]
+                              itemsAwarded[itemName] = itemsAwarded[itemName] ? itemsAwarded[itemName] + item.item_count : item.item_count
+                            })
+                          }
+
+                          winston.debug('Human wait...')
+                          setTimeout(() => resolve(searchPokeStopResponse), 10000)
+                          return searchPokeStopResponse
+                        })
                       })
+
+
+
+                      return waitPromise
                     }
                   })
                   searchPokeStopsPromise = searchPokeStopActions.reduce((promise, searchPokeStopAction) => promise.then(searchPokeStopAction), Promise.resolve())
