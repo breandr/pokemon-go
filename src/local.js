@@ -15,15 +15,12 @@ const centerLocation = {
       // longitude: -122.891396
       //
       // central Park
-      // latitude: 40.781217,
-      // longitude: -73.963575
+      latitude: 40.781217,
+      longitude: -73.963575
       //
       // santa monica pier
       // latitude: 34.0081311709505,
       // longitude: -118.49679708480834
-
-      latitude:34.013395,
-      longitude: -118.494301
   }
 }
 
