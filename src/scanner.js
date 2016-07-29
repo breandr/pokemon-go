@@ -1,8 +1,6 @@
 'use strict';
 console.log('Loading function');
-import pokeTrackr from './poke-trackr'
-import logPokemonSightings from './pokemon-sightings'
-console.log(logPokemonSightings)
+const pokeTrackr = require('./poke-trackr')
 
 /**
  * Provide an event that contains the following keys:
@@ -19,24 +17,21 @@ export default function (event, context, callback) {
     const centerLocation = {
         type: 'coords',
         coords: {
-          latitude: -24.574473,
-          longitude: 149.966701
+          latitude: -24.572491,
+          longitude: 149.973769
         }
     }
 
-    const username = process.env.PGO_USERNAME || 'poke.go.sentry1@gmail.com';
-    const password = process.env.PGO_PASSWORD || 'pokegosentry1';
+    const username = process.env.PGO_USERNAME || 'poke.go.sentry2@gmail.com';
+    const password = process.env.PGO_PASSWORD || 'pokegosentry2';
     const provider = process.env.PGO_PROVIDER || 'google';
-    const initCallback = function(error, response) {
-      if(error) throw error
-    }
-    const heartbeatCallback = function(error, {pokemonSightings, pointsOfInterestMapUrl}) {
-      if(error) throw error
-      console.log('=========')
-      console.log(pointsOfInterestMapUrl)
-      console.log('=========')
-      // logPokemonSightings({pokemonSightings})
-    }
 
-    pokeTrackr.init({username, password, centerLocation, provider, initCallback, heartbeatCallback})
+    const user = pokeTrackr.getUser({username, password, provider})
+    return user.init({user, centerLocation})
+    .then(() => {
+      return user.scanForPokemon({centerLocation, numNeighborCells: 21, radius: 10, mapZoomLevel: 13, attemptToCatch: false, searchPokeStops: false, method: 'WALK'})
+      .then(({pokemonLocations, pokemonCaught, pokeStopsSearched, itemsAwarded, coords, cellsScanned}) => {
+        callback(null, {pokemonLocations, pokemonCaught, pokeStopsSearched, itemsAwarded, coords, cellsScanned})
+      })
+    })
 };

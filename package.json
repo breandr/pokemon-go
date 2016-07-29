@@ -11,7 +11,7 @@
     "babel-polyfill": "^6.8.0",
     "dynamodb-data-types": "^3.0.0",
     "geolib": "^2.0.21",
-    "pokemon-go-node-api": "github:armax/Pokemon-GO-node-api",
+    "pokemon-go-node-api": "github:armax/Pokemon-GO-node-api#pull/165/head",
     "pokemon-go-pokedex": "github:biuni/PokemonGOPokedex",
     "promisify-node": "^0.4.0",
     "winston": "^2.2.0"
@@ -38,7 +38,7 @@
     "webhook"
   ],
   "license": "MIT",
-  "main": "scanner.js",
+  "main": "src/scanner.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/andrbret/pokemon-go-trackr.git"

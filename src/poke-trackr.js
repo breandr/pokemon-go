@@ -1,9 +1,9 @@
 const promisify = require('promisify-node')
 const PokemonGo = require('pokemon-go-node-api/poke.io')
-const s2Geo = require('s2geometry-node')
+const s2Geo = require('s2-geometry').S2
 const async = require('async')
 const winston = require('winston')
-winston.level = 'debug'
+winston.level = 'info'
 
 const DEFAULT_MAP_ZOOM_LEVEL = 15
 const DEFAULT_WALK_DISTANCE = 0.0009
@@ -420,12 +420,21 @@ function getUser({username, password, provider}){
 
             return Promise.all([catchPokemonPromise, searchPokeStopsPromise])
         })
+        .catch(e => {
+          console.log('heartbeaterror', e)
+        })
       }
     })
 
     return steps.reduce((promise, step) => promise.then(step), Promise.resolve())
-    .then(() => {
+    .then((r) => {
+      console.log(r)
+      console.log({pokemonLocations, pokemonCaught, pokeStopsSearched, itemsAwarded, coords, cellsScanned})
       return {pokemonLocations, pokemonCaught, pokeStopsSearched, itemsAwarded, coords, cellsScanned}
+    })
+    .catch(e => {
+      console.log('stepserror', e)
+      return e
     })
   }
 
@@ -531,8 +540,8 @@ function getUser({username, password, provider}){
   }
 
   function getCellFromId(cellId) {
-      const s2CellId = new s2Geo.S2CellId(cellId.toString())
-      const cell = new s2Geo.S2Cell(s2CellId);
+      // const s2CellId = s2Geo.toId(cellId.toString())
+      const cell = s2Geo.fromId(cellId.toString());
 
       return cell
   }
