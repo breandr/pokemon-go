@@ -274,30 +274,20 @@ function getUser({username, password, provider}){
     }
 
   function setLocationAndSearch({centerLocation, numNeighborCells}) {
-    const waitPromise = new Promise((resolve, reject) => {
-      setTimeout(() => {
-        function f() {
-          return user.SetLocation(centerLocation)
-              .then(coordinates => {
-                // winston.info(`Moved to ${coordinates.latitude},${coordinates.longitude}`)
-                return user.Heartbeat(/*numNeighborCells*/)
-                .then(r => {
-                  console.log('success')
-                  return resolve(r)
-                })
-                .catch(e => {
-                  console.log('heartbeat failed; retrying')
-                  return f()
-                })
-              })
-            }
-
-        return f()
-
-      }, 0)
-    })
-
-      return waitPromise
+      return user.SetLocation(centerLocation)
+          .then(coordinates => {
+            // winston.info(`Moved to ${coordinates.latitude},${coordinates.longitude}`)
+            return user.Heartbeat(/*numNeighborCells*/)
+            .then(r => {
+              console.log('success')
+              return r
+            })
+            .catch(e => {
+              console.log('heartbeat failed; retrying')
+              return setLocationAndSearch({centerLocation, numNeighborCells})
+            })
+          })
+        }
   }
 
   // NOTE: not working - getting unexpected cells, propbably bug in s2 lib
