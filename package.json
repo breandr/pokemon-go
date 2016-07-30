@@ -6,6 +6,20 @@
   "bugs": {
     "url": "https://github.com/andrbret/pokemon-go-trackr/issues"
   },
+  "scripts": {
+    "deploy": "node-lambda deploy --handler dist/src/scanner.default --configFile deploy.env --functionName $npm_package_name --description \"$npm_package_description\"",
+    "lambda": "node-lambda",
+    "package": "node-lambda package --handler dist/src/scanner.default --configFile deploy.env --functionName $npm_package_name --excludeGlobs \"./scanner.js webpack.config.js context.json event.json .babelrc .nvmrc .gitignore LICENSE.md README.md\"",
+    "postinstall": "node-lambda setup",
+    "predeploy": "NODE_ENV=production webpack -p",
+    "prepackage": "NODE_ENV=production webpack -p",
+    "pretest": "webpack",
+    "local": "node-lambda run --handler dist/src/scanner.default",
+    "setup": "node-lambda setup",
+    "start": "webpack --watch",
+    "test": "eval $([ -f deploy.env ] && cat deploy.env) node-lambda run --handler dist/src/scanner.default",
+    "webpack": "webpack"
+  },
   "dependencies": {
     "async": "^2.0.1",
     "babel-polyfill": "^6.8.0",
@@ -42,19 +56,5 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/andrbret/pokemon-go-trackr.git"
-  },
-  "scripts": {
-    "deploy": "node-lambda deploy --handler dist/scanner.default --configFile deploy.env --functionName $npm_package_name --description \"$npm_package_description\"",
-    "lambda": "node-lambda",
-    "package": "node-lambda package --handler dist/scanner.default --configFile deploy.env --functionName $npm_package_name --excludeGlobs \"./scanner.js webpack.config.js context.json event.json .babelrc .nvmrc .gitignore LICENSE.md README.md\"",
-    "postinstall": "node-lambda setup",
-    "predeploy": "NODE_ENV=production webpack -p",
-    "prepackage": "NODE_ENV=production webpack -p",
-    "pretest": "webpack",
-    "local": "node-lambda run --handler dist/scanner.default",
-    "setup": "node-lambda setup",
-    "start": "webpack --watch",
-    "test": "eval $([ -f deploy.env ] && cat deploy.env) node-lambda run --handler dist/scanner.default",
-    "webpack": "webpack"
   }
 }
