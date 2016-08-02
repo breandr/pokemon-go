@@ -37,22 +37,34 @@ export default function (event, context, callback) {
     let userInit = Promise.resolve()
 
     // caching user
-    if(!user) {
-      user = pokeTrackr.getUser({username, password, provider})
-      userInit user.init({user, centerLocation: scanRequest.centerLocation})
-    }
-    
-    return userInit
+    // if(!user) {
+    //   user = pokeTrackr.getUser({username, password, provider})
+    //   userInit = user.init({user, centerLocation: scanRequest.centerLocation})
+    // }
+    // console.log(userInit)
+const user = pokeTrackr.getUser({username, password, provider})
+    return user.init({user, centerLocation: scanRequest.centerLocation})
     .then(() => {
+      console.log('inited')
       return user.scanForPokemon(scanRequest)
-      .then(({pokemonLocations, coordsScanned, cellsScanned}) => {
-        const response = {pokemonLocations}
+      .then(({pokemonLocations, pokeStops, gyms, coordsScanned, cellsScanned}) => {
+        const response = {pokemonLocations, pokeStops, gyms}
         if(event.includeCoordsScanned) {
           response.coordsScanned = coordsScanned
           response.cellsScanned = cellsScanned
         }
+
+      const pokemonNames = pokemonLocations.map(p => user.getPokedexInfo({pokemonId: p.data.PokedexTypeId}).name).sort()
+      console.log(pokemonNames)
         callback(null, response)
       })
-      .catch(e => console.log(e))
+      .catch(e => {
+        console.log(e)
+        callback(e)
+      })
     })
+      .catch(e => {
+        console.log(e)
+        callback(e)
+      })
 };
