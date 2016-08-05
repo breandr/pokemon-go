@@ -1,5 +1,5 @@
-const promisify = require('promisify-node')
-const PokemonGo = require('pokemon-go-node-api/poke.io')
+const bluebird = require('bluebird')
+const PokemonGo = require('../Pokemon-GO-node-api/poke.io')
 const s2Geo = require('s2-geometry').S2
 const async = require('async')
 const Log = require('log')
@@ -81,18 +81,17 @@ const ITEM_ID_TO_NAME_MAP = {
 }
 const CATCH_POKEMON_STATUS = ['Unexpected error', 'Successful catch', 'Catch Escape', 'Catch Flee', 'Missed Catch']
 const SEARCH_POKE_STOPS_STATUS = ['No result set', 'Success', 'Out of range', 'In cooldown period', 'Inventory full']
-function getUser({username, password, provider}){
+function getUser({username, password, provider, googleMaps}){
   const pokeIo = new PokemonGo.Pokeio()
-  const user = promisify(pokeIo, undefined, true)
+  const user = bluebird.promisifyAll(pokeIo)
   function init({centerLocation}) {
     function retryableInit() {
-      return user.init(username, password, centerLocation, provider)
+      return user.initAsync(username, password, centerLocation, provider, googleMaps)
       .then(() => {
-        console.log('yea')
           log.info(`Current location ${user.playerInfo.locationName}`)
           log.info(`latitude/longitude: ${user.playerInfo.latitude},${user.playerInfo.longitude}`)
 
-          return user.GetProfile()
+          return user.GetProfileAsync()
           .then(profile => {
               const pokeCoin = profile.currency[0].amount || 0;
               const starDust = profile.currency[1].amount || 0;
@@ -111,6 +110,7 @@ function getUser({username, password, provider}){
         console.log('error on init...')
         log.info(e)
         log.info('Error on init; retyring')
+        return Promise.reject(e)
         return retryableInit()
       })
     }
@@ -291,10 +291,10 @@ function getUser({username, password, provider}){
     }
 
   function setLocationAndSearch({centerLocation, numNeighborCells}) {
-    return user.SetLocation(centerLocation)
+    return user.SetLocationAsync(centerLocation)
       .then(coordinates => {
         // log.info(`Moved to ${coordinates.latitude},${coordinates.longitude}`)
-        return user.Heartbeat(/*numNeighborCells*/)
+        return user.HeartbeatAsync(/*numNeighborCells*/)
         .catch(e => {
           log.info(e)
           log.info('Error on SetLocation; retrying')
@@ -369,104 +369,109 @@ function getUser({username, password, provider}){
 
     const steps = coordsScanned.map(({latitude, longitude}) => {
       return function () {
-          const nextLocation = {
-            type: 'coords',
-            coords: {
-              latitude,
-              longitude
+            const nextLocation = {
+              type: 'coords',
+              coords: {
+                latitude,
+                longitude
+              }
             }
-          }
 
-        return setLocationAndSearch({centerLocation: nextLocation, numNeighborCells: 0})
-        .then(heartbeat => {
-            const cellsWithPokemon = heartbeat.cells.filter(cell => cell.MapPokemon.length)
-            cellsWithPokemon.forEach(cell => {
-                cellsScanned.push(getCellFromId(cell.S2CellId))
-                printCellData({cell})
-                const unmappedPokemon = cell.MapPokemon.filter(mapPokemon => {
-                  const encounterIds = pokemonLocations.map(pokemonLocation => pokemonLocation.data.EncounterId.toString())
-                  return encounterIds.indexOf(mapPokemon.EncounterId.toString()) === -1
-                })
+          const throttlePromise = new Promise((resolve, reject) => {
+            setTimeout(resolve, 1000)
+          })
 
-                const mapPokemonFound = getMapPokemon({mapPokemons: unmappedPokemon})
-                const pokeStopForts = cell.Fort.filter(fort => fort.FortType === 1)
-                const pokeStopsFound = getPokeStops({pokeStops: pokeStopForts})
+          return throttlePromise
+          .then(() => setLocationAndSearch({centerLocation: nextLocation, numNeighborCells: 0}))
+          .then(heartbeat => {
+              const cellsWithPokemon = heartbeat.cells.filter(cell => cell.MapPokemon.length)
+              cellsWithPokemon.forEach(cell => {
+                  cellsScanned.push(getCellFromId(cell.S2CellId))
+                  printCellData({cell})
+                  const unmappedPokemon = cell.MapPokemon.filter(mapPokemon => {
+                    const encounterIds = pokemonLocations.map(pokemonLocation => pokemonLocation.data.EncounterId.toString())
+                    return encounterIds.indexOf(mapPokemon.EncounterId.toString()) === -1
+                  })
 
-                let catchPokemonPromise = Promise.resolve()
-                let searchPokeStopsPromise = Promise.resolve()
-                if(mapPokemonFound.length) {
-                  pokemonLocations.push(...mapPokemonFound)
-                  log.info(`Found ${mapPokemonFound.length} pokemon`)
-                  if(attemptToCatch) {
-                    const catchPokemonActions = mapPokemonFound.map(mapPoke => {
-                      return function() {
-                          const pokemon = mapPoke.data
-                          const pokedexInfo = getPokedexInfo({pokemonId: pokemon.PokedexTypeId})
-                          log.info(`Found a ${pokedexInfo.name}! Attempting to catch...`)
-                          return catchPokemon({pokemon})
-                            .then(catchPokemonResponse => {
-                              if(catchPokemonResponse.Status === 1) {
-                                pokemonCaught.push(pokedexInfo.name)
+                  const mapPokemonFound = getMapPokemon({mapPokemons: unmappedPokemon})
+                  const pokeStopForts = cell.Fort.filter(fort => fort.FortType === 1)
+                  const pokeStopsFound = getPokeStops({pokeStops: pokeStopForts})
+
+                  let catchPokemonPromise = Promise.resolve()
+                  let searchPokeStopsPromise = Promise.resolve()
+                  if(mapPokemonFound.length) {
+                    pokemonLocations.push(...mapPokemonFound)
+                    log.info(`Found ${mapPokemonFound.length} pokemon`)
+                    if(attemptToCatch) {
+                      const catchPokemonActions = mapPokemonFound.map(mapPoke => {
+                        return function() {
+                            const pokemon = mapPoke.data
+                            const pokedexInfo = getPokedexInfo({pokemonId: pokemon.PokedexTypeId})
+                            log.info(`Found a ${pokedexInfo.name}! Attempting to catch...`)
+                            return catchPokemon({pokemon})
+                              .then(catchPokemonResponse => {
+                                if(catchPokemonResponse.Status === 1) {
+                                  pokemonCaught.push(pokedexInfo.name)
+                                }
+
+                                return catchPokemonResponse
+                              })
+                              .catch(e => {
+                                console.error(e)
+                              })
+                          }
+                        })
+                      catchPokemonPromise = catchPokemonActions.reduce((promise, catchPokemonAction) => promise.then(catchPokemonAction), Promise.resolve())
+                    }
+                  }
+
+                  if(pokeStopsFound.length) {
+                    pokeStopLocations.push(...pokeStopsFound)
+
+                    if(searchPokeStops) {
+                      const searchPokeStopActions = pokeStopsFound.map(pokeStopFound => {
+                        return function() {
+                            const waitPromise = new Promise(resolve => {
+                              const pokeStop = pokeStopFound.data
+
+                              log.debug(`Found a PokeStop! Attempting to search...`)
+
+                              if(pokeStop.CooldownCompleteMs !== null) {
+                                log.debug('pokeStop is on cooldown')
+                                return resolve()
                               }
 
-                              return catchPokemonResponse
+                              return searchFort({fortId: pokeStop.FortId, latitude: pokeStop.Latitude, longitude: pokeStop.Longitude})
+                              .then(searchPokeStopResponse => {
+                                log.debug('searchPokeStopResponse', searchPokeStopResponse)
+                                if(searchPokeStopResponse.result === 1 && searchPokeStopResponse.items_awarded.length) {
+                                  pokeStopsSearched.push(searchPokeStopResponse)
+                                  searchPokeStopResponse.items_awarded.forEach(item => {
+                                    const itemName = ITEM_ID_TO_NAME_MAP[item.item_id]
+                                    itemsAwarded[itemName] = itemsAwarded[itemName] ? itemsAwarded[itemName] + item.item_count : item.item_count
+                                  })
+                                }
+
+                                log.debug('Human wait...')
+                                setTimeout(() => resolve(searchPokeStopResponse), 10000)
+                                return searchPokeStopResponse
+                              })
                             })
-                            .catch(e => {
-                              console.error(e)
-                            })
-                        }
-                      })
-                    catchPokemonPromise = catchPokemonActions.reduce((promise, catchPokemonAction) => promise.then(catchPokemonAction), Promise.resolve())
-                  }
+
+                            return waitPromise
+                          }
+                        })
+                        searchPokeStopsPromise = searchPokeStopActions.reduce((promise, searchPokeStopAction) => promise.then(searchPokeStopAction), Promise.resolve())
+                    }
                 }
 
-                if(pokeStopsFound.length) {
-                  pokeStopLocations.push(...pokeStopsFound)
-
-                  if(searchPokeStops) {
-                    const searchPokeStopActions = pokeStopsFound.map(pokeStopFound => {
-                      return function() {
-                          const waitPromise = new Promise(resolve => {
-                            const pokeStop = pokeStopFound.data
-
-                            log.debug(`Found a PokeStop! Attempting to search...`)
-
-                            if(pokeStop.CooldownCompleteMs !== null) {
-                              log.debug('pokeStop is on cooldown')
-                              return resolve()
-                            }
-
-                            return searchFort({fortId: pokeStop.FortId, latitude: pokeStop.Latitude, longitude: pokeStop.Longitude})
-                            .then(searchPokeStopResponse => {
-                              log.debug('searchPokeStopResponse', searchPokeStopResponse)
-                              if(searchPokeStopResponse.result === 1 && searchPokeStopResponse.items_awarded.length) {
-                                pokeStopsSearched.push(searchPokeStopResponse)
-                                searchPokeStopResponse.items_awarded.forEach(item => {
-                                  const itemName = ITEM_ID_TO_NAME_MAP[item.item_id]
-                                  itemsAwarded[itemName] = itemsAwarded[itemName] ? itemsAwarded[itemName] + item.item_count : item.item_count
-                                })
-                              }
-
-                              log.debug('Human wait...')
-                              setTimeout(() => resolve(searchPokeStopResponse), 10000)
-                              return searchPokeStopResponse
-                            })
-                          })
-
-                          return waitPromise
-                        }
-                      })
-                      searchPokeStopsPromise = searchPokeStopActions.reduce((promise, searchPokeStopAction) => promise.then(searchPokeStopAction), Promise.resolve())
-                  }
-              }
-
-              return Promise.all([catchPokemonPromise, searchPokeStopsPromise])
+                return Promise.all([catchPokemonPromise, searchPokeStopsPromise])
+            })
           })
-        })
-        .catch(e => {
-          log.info(e)
-          log.info('Error from setLocationAndSearch')
-        })
+          .catch(e => {
+            log.info(e)
+            log.info('Error from setLocationAndSearch')
+          })
       }
     })
 
@@ -484,7 +489,7 @@ function getUser({username, password, provider}){
   function catchPokemon({pokemon}) {
     const pokedexInfo = getPokedexInfo({pokemonId: pokemon.PokedexTypeId})
 
-    return user.EncounterPokemon(pokemon)
+    return user.EncounterPokemonAsync(pokemon)
     .then(encounterPokemonResponse => {
         log.info(`Encountering pokemon ${pokedexInfo.name}...`)
         const normalizedHitPosition = 1
@@ -492,7 +497,7 @@ function getUser({username, password, provider}){
         const spinModifier = 1
         const pokeball = 1
 
-        return user.CatchPokemon(pokemon, normalizedHitPosition, normalizedReticleSize, spinModifier, pokeball)
+        return user.CatchPokemonAsync(pokemon, normalizedHitPosition, normalizedReticleSize, spinModifier, pokeball)
         .then(catchPokemonResponse => {
             if(catchPokemonResponse.Status === null) {
               log.info(`You either have no pokeballs or pokemon storage is full`)
@@ -514,8 +519,8 @@ function getUser({username, password, provider}){
       type: 'coords',
       coords: { latitude, longitude}
     }
-    return user.SetLocation(pokeStopLocation)
-    .then(() => user.GetFort(fortId, latitude, longitude))
+    return user.SetLocationAsync(pokeStopLocation)
+    .then(() => user.GetFortAsync(fortId, latitude, longitude))
     .then(searchFortResponse => {
       if(searchFortResponse.result === 1 && !searchFortResponse.items_awarded.length) {
         log.info(`Item storage is full, or you've been soft-banned`)
@@ -525,11 +530,11 @@ function getUser({username, password, provider}){
   }
 
   function searchCurrentLocation({centerLocation, numNeighborCells = 20, mapZoomLevel = DEFAULT_MAP_ZOOM_LEVEL}) {
-      const currentCoords = user.GetLocationCoords()
+      const currentCoords = user.GetLocationCoordsAsync()
       log.debug(`searching ${currentCoords.latitude},${currentCoords.longitude} and ${numNeighborCells} neighboring cells`)
 
       function retryableHeartbeat() {
-        return user.Heartbeat(/*numNeighborCells*/)
+        return user.HeartbeatAsync(/*numNeighborCells*/)
         .then(heartbeat => {
 
             const neighboringCells = []

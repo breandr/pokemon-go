@@ -1,5 +1,5 @@
 {
-  "name": "PokemonGoTrackr",
+  "name": "pokemon-go-js-api",
   "description": "Pokemon Go Trackr.",
   "version": "1.0.0",
   "author": "Brett Andrews <brett.j.andrews@gmail.com>",
@@ -25,10 +25,13 @@
     "babel-polyfill": "^6.8.0",
     "dynamodb-data-types": "^3.0.0",
     "geolib": "^2.0.21",
+    "google-maps": "^3.2.1",
     "log": "^1.4.0",
     "pokemon-go-node-api": "github:armax/Pokemon-GO-node-api#pull/165/head",
     "pokemon-go-pokedex": "github:biuni/PokemonGOPokedex",
-    "promisify-node": "^0.4.0"
+    "promisify-node": "^0.4.0",
+    "raw-loader": "^0.5.1",
+    "whatwg-fetch": "^1.0.0"
   },
   "devDependencies": {
     "babel-core": "^6.8.0",
